@@ -236,3 +236,73 @@ Os seguintes atributos estão disponíveis para uso em testes automatizados (Cyp
 - Cancelar um pedido e não confirmar → pedido mantido
 - Filtrar pedidos por status → apenas pedidos do status selecionado exibidos
 - Verificar se o total é calculado corretamente para múltiplos itens
+
+---
+
+## 🧪 Relatório de Testes e Achados de QA (Qualidade de Software)
+
+**Responsável pelos Testes:** Guilherme Monteiro do Nascimento (Matrícula: 20******1225)  
+**Branch de Trabalho:** `feature/testes-guilherme`  
+**Ambiente de Execução:** GitHub Codespaces (Node.js v18 / Vite / JSON Server)  
+**Data da Execução:** Outubro / 2026  
+
+---
+
+### 📋 Mapeamento de Bugs e Anomalias Identificadas
+
+#### 🔴 BUG-001: Dessincronização dos Contadores na Barra de Filtros de Status
+* **ID CT/TP:** TP 02 / CT002
+* **Severidade:** Alta
+* **Status:** Aberto
+* **Descrição:** Ao alterar o status de um pedido através do seletor no cartão (ex.: de *Pendente* para *Preparando* ou *Entregue*) ou ao excluir um pedido, os contadores numéricos localizados na barra superior de filtros (`Todos`, `Pendente`, `Preparando`, `Pronto`, `Entregue`) não são recalculados nem atualizados dinamicamente.
+* **Passos para Reproduzir:**
+  1. Acessar a tela inicial de *Pedidos* (`http://localhost:3000`).
+  2. Observar a contagem atual dos filtros superiores.
+  3. Alterar o status de um pedido no cartão.
+  4. Observar que a barra superior permanece com os valores desatualizados até que a página seja recarregada manualmente (`F5`).
+* **Resultado Esperado:** Os contadores da barra superior e a lista de pedidos devem atualizar imediatamente via re-renderização de estado no React sem exigir reload da página.
+* **Resultado Obtido:** Apenas o chip individual do cartão muda de cor/status, enquanto a contagem superior permanece estática.
+
+---
+
+#### 🔴 BUG-002: Duplicação de Pedidos por Cliques Múltiplos no Botão "Registrar Pedido"
+* **ID CT/TP:** TP 01 / CT001
+* **Severidade:** Alta
+* **Status:** Aberto
+* **Descrição:** Ausência de controle de *debounce* ou bloqueio imediato (`disabled`) no botão de envio do formulário, permitindo que cliques rápidos e seguidos submetam requisições HTTP POST duplicadas para a API.
+* **Passos para Reproduzir:**
+  1. Acessar a tela *Novo Pedido*.
+  2. Preencher o nome do cliente (ex.: `Teste Duplicação`) e adicionar itens à lista.
+  3. Clicar duas vezes seguidas e rapidamente no botão **Registrar Pedido**.
+* **Resultado Esperado:** O botão deve ser desativado imediatamente no primeiro clique (estado de *loading*/*disabled*) e o estado do formulário deve ser reiniciado/zerado até a conclusão do redirecionamento.
+* **Resultado Obtido:** O sistema processou ambos os cliques e criou dois registros idênticos simultâneos no banco de dados `db.json` (Pedido #5 e Pedido #6 às 23:15, ambos com valor de R$ 29.50).
+
+---
+
+#### 🟡 BUG-003: Aceitação de Quantidades Fracionadas/Decimais no Formulário e Inconsistência ao Salvar
+* **ID CT/TP:** TP 01 / CT001
+* **Severidade:** Média
+* **Status:** Aberto
+* **Descrição:** O campo de entrada de quantidade (`Qtd`) aceita números fracionados/decimais (ex.: `1.5`), realizando o cálculo do subtotal no formulário, mas a API/listagem converte a quantidade para número inteiro mantendo o valor alterado, gerando divergência de dados.
+* **Passos para Reproduzir:**
+  1. Acessar a tela *Novo Pedido*.
+  2. Selecionar um produto (ex.: X-Bacon a R$ 22,00).
+  3. Digitar `1.5` no campo `Qtd` e clicar em **+ ADICIONAR**.
+  4. Clicar em **REGISTRAR PEDIDO** e observar o cartão gerado na tela inicial.
+* **Resultado Esperado:** O campo de quantidade deve aceitar e validar estritamente números inteiros (bloqueando decimais) ou a aplicação deve persistir e exibir a quantidade fracionada exata de forma consistente.
+* **Resultado Obtido:** O formulário aceitou `1.5` e calculou R$ 33,00, mas o cartão gerado salvou como `1 item — R$ 33.00` (Pedido #7 às 23:25), corrompendo a relação de preço unitário e quantidade.
+
+---
+
+#### 🔴 BUG-004: Ausência de Tratamento de Erro HTTP e Falsa Confirmação com Servidor Offline (Porta 3001)
+* **ID CT/TP:** TP 01 / CT001
+* **Severidade:** Alta
+* **Status:** Aberto
+* **Descrição:** Falta de tratamento de exceções (blocos `.catch` / `try-catch`) em requisições à API (`JSON Server`). Quando a porta 3001 é encerrada, a aplicação simula sucesso na interface React, gerando uma falsa confirmação de registro visual sem persistência real dos dados.
+* **Passos para Reproduzir:**
+  1. No terminal, interromper a execução do `json-server` (porta 3001) mantendo apenas a porta 3000 ativa.
+  2. Acessar a tela *Novo Pedido*.
+  3. Cadastrar um cliente (ex.: `Teste de Servidor`), adicionar um item e clicar em **Registrar Pedido**.
+  4. Observar a tela de pedidos e atualizar a página (`F5`).
+* **Resultado Esperado:** O sistema deve capturar a falha de conexão HTTP e exibir um alerta de erro amigável na interface (ex.: *"Erro ao conectar com o servidor"*), impedindo o cadastro e mantendo os dados no formulário.
+* **Resultado Obtido:** A aplicação ignorou a falha de rede, exibiu a mensagem de *"Registrado com sucesso"* e criou visualmente o Pedido #9 na tela. Ao recarregar com `F5`, o pedido sumiu permanentemente por nunca ter sido gravado no `db.json`.
